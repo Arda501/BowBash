@@ -56,9 +56,14 @@ switched to Survival, and back to Adventure once the round ends.
 
 The `/bb savemap` baseline is restored block-for-block the instant a round ends —
 covers everything that changed, broken or placed, not just what BowBash itself
-touched — and persists to disk, so it survives a server restart; nothing is
-re-captured automatically, the saved baseline is what every round resets to
-until you `savemap` again.
+touched, including chest/barrel/furnace/etc. contents (not just the block itself) —
+and persists to disk, so it survives a server restart; nothing is re-captured
+automatically, the saved baseline is what every round resets to until you
+`savemap` again.
+
+> Upgrading from an older version: `savemap`'s save format changed to also cover
+> container contents. Run `/bb savemap <arena>` again for each of your arenas -
+> any `.snapshot` file saved before this update won't load.
 
 Placing **light blue stained glass** and **orange stained glass** anywhere in an
 arena (typically near a team's spawn) creates an infinite block-farming resource:

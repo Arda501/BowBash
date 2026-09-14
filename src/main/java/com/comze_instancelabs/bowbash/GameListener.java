@@ -8,10 +8,7 @@ import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.data.type.Slab;
 import org.bukkit.entity.Arrow;
-import org.bukkit.entity.Chicken;
 import org.bukkit.entity.Egg;
-import org.bukkit.entity.Entity;
-import org.bukkit.entity.Item;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Snowball;
 import org.bukkit.event.EventHandler;
@@ -21,7 +18,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
@@ -31,8 +27,6 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
-import org.bukkit.potion.PotionEffect;
-import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.BlockIterator;
 
 /**
@@ -151,29 +145,6 @@ public class GameListener implements Listener {
 				a.toggleReady(p);
 			}
 		});
-	}
-
-	@EventHandler
-	public void onPickup(EntityPickupItemEvent event) {
-		if (!(event.getEntity() instanceof Player p)) {
-			return;
-		}
-		Optional<Arena> arenaOpt = arenaOf(p);
-		if (arenaOpt.isEmpty() || !arenaOpt.get().isInGame()) {
-			return;
-		}
-		Item item = event.getItem();
-		if (item.getItemStack().getType() == Material.POTION) {
-			p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, 200, 1));
-			p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, 200, 1));
-			event.setCancelled(true);
-			item.remove();
-		}
-		for (Entity e : p.getNearbyEntities(3D, 3D, 3D)) {
-			if (e instanceof Chicken) {
-				e.remove();
-			}
-		}
 	}
 
 	@EventHandler

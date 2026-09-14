@@ -18,7 +18,6 @@ import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
-import org.bukkit.scheduler.BukkitTask;
 
 /**
  * A single BowBash arena: its configured locations plus the live state of whatever match (if any)
@@ -63,8 +62,6 @@ public class Arena {
 
 	/** Ticks left before a dead player is force-respawned; see {@link #beginRespawnDelay}. */
 	private final Map<UUID, Integer> pendingRespawns = new LinkedHashMap<>();
-
-	private BukkitTask powerupTask;
 
 	private final MapSnapshot snapshot = new MapSnapshot();
 
@@ -457,9 +454,6 @@ public class Arena {
 
 		broadcast(ChatColor.GREEN + "Go! Shoot the ground out from under the other team!");
 		plugin.getScoreboardManager().updateInGame(this);
-
-		int intervalTicks = Math.max(1, plugin.getConfig().getInt("config.powerup_interval_seconds", 3)) * 20;
-		powerupTask = Bukkit.getScheduler().runTaskTimer(plugin, this::maybeSpawnPowerup, intervalTicks, intervalTicks);
 	}
 
 	/**
@@ -495,25 +489,6 @@ public class Arena {
 			}
 			entry.setValue(ticksLeft);
 		}
-	}
-
-	private void maybeSpawnPowerup() {
-		if (state != ArenaState.INGAME) {
-			return;
-		}
-		int chance = plugin.getConfig().getInt("config.powerup_spawn_percentage", 10);
-		if (Math.random() * 100 > chance) {
-			return;
-		}
-		java.util.List<UUID> alive = players.stream().filter(id -> Bukkit.getPlayer(id) != null).toList();
-		if (alive.isEmpty()) {
-			return;
-		}
-		Player target = Bukkit.getPlayer(alive.get((int) (Math.random() * alive.size())));
-		if (target == null) {
-			return;
-		}
-		Powerups.spawn(plugin, target.getLocation().clone().add(0, 5, 0));
 	}
 
 	/**
@@ -606,11 +581,6 @@ public class Arena {
 			}
 		}
 
-		if (powerupTask != null) {
-			powerupTask.cancel();
-			powerupTask = null;
-		}
-
 		Bukkit.getScheduler().runTaskLater(plugin, () -> {
 			reset();
 			playVictoryCelebration(winner);
@@ -676,10 +646,6 @@ public class Arena {
 
 	/** Force-stops the arena immediately, e.g. from an admin command or plugin shutdown. */
 	public void forceStop() {
-		if (powerupTask != null) {
-			powerupTask.cancel();
-			powerupTask = null;
-		}
 		countdownTicksRemaining = -1;
 		boolean wasRunning = state == ArenaState.INGAME || state == ArenaState.STARTING;
 		if (wasRunning) {
