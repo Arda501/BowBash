@@ -69,13 +69,18 @@ can't mine (or deplete) them at all.
 
 Falling out of the arena scores a point immediately (decided the moment a player
 first drops below Y=0), with a sound cue for the whole arena and the scoreboard
-updated on the spot. BowBash deliberately doesn't force a teleport or touch actual
-death on a fall — it expects something else on the server to handle what happens
-to a player physically after that point — but it does redirect any respawn that
-does happen back to the player's own team spawn (instead of the world spawn) for
-as long as their round is still live, and keeps ordinary combat from killing
-anyone outright. Winning a round plays a victory sound for every player on the
-server plus a firework burst at the arena's lobby.
+updated on the spot. BowBash doesn't touch health, damage, or death/respawn at
+all beyond cancelling friendly fire — it never resets a player's health, so
+whatever else is handling death (a command block, another plugin, plain vanilla)
+works exactly as it would outside BowBash; it does still redirect any respawn
+that happens back to the player's own team spawn (instead of the world spawn)
+for as long as their round is live. Winning a round plays a victory sound for
+every player on the server plus a firework burst at the arena's lobby.
+
+**Blue/black/red/light blue glazed terracotta**, **polished sulfur slabs**, and
+**dark prismarine slabs** can't be broken at all, by anyone, through any means
+(mining, arrows, egg/snowball explosions) while a game is on — useful for map
+borders, decoration, or anything else that should never come apart.
 
 Links
 -----

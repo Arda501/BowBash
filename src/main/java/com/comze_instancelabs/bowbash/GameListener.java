@@ -21,7 +21,6 @@ import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
-import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
@@ -38,9 +37,10 @@ import org.bukkit.util.BlockIterator;
 /**
  * All of BowBash's actual gameplay: falling below the arena scores a point, arrows/eggs/snowballs
  * eat away at the map, and blocks broken near a spawn platform hand back the material instead of
- * just vanishing. Actual player death and respawn are deliberately left untouched here - handled
- * separately, outside this plugin - beyond the health-lock that keeps ordinary combat from killing
- * anyone outright (see {@link #onEntityDamage}/{@link #onEntityDamageByEntity}).
+ * just vanishing. Health, damage and death/respawn are entirely someone else's problem - BowBash
+ * doesn't touch any of it beyond {@link #onEntityDamageByEntity} cancelling friendly fire; in
+ * particular it never resets a player's health, so whatever else is handling death (a command
+ * block, another plugin, plain vanilla) works exactly as it would outside BowBash.
  *
  * This is a straight port of the original mechanics off the pre-1.13 numeric block-id/data-value API
  * (which no longer exists) onto modern {@link Material}/{@link org.bukkit.block.data.BlockData}.
@@ -85,19 +85,10 @@ public class GameListener implements Listener {
 	}
 
 	@EventHandler
-	public void onEntityDamage(EntityDamageEvent event) {
-		if (!(event.getEntity() instanceof Player p)) {
-			return;
-		}
-		arenaOf(p).ifPresent(a -> {
-			if (a.isInGame()) {
-				p.setHealth(20D);
-			}
-		});
-	}
-
-	@EventHandler
 	public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
+		// Only friendly fire is BowBash's business here - it doesn't touch health/damage/death at
+		// all otherwise (see the class doc): that's left entirely to the server, including a
+		// player actually dying from combat, fall, void, or anything else.
 		if (!(event.getEntity() instanceof Player p)) {
 			return;
 		}
@@ -118,10 +109,6 @@ public class GameListener implements Listener {
 		if (attacker != null && victimTeam != null && victimTeam == a.getTeam(attacker.getUniqueId())) {
 			event.setCancelled(true);
 		}
-		if (attacker != null) {
-			attacker.setHealth(20D);
-		}
-		Bukkit.getScheduler().runTaskLater(plugin, () -> p.setHealth(20D), 5L);
 	}
 
 	@EventHandler
@@ -216,6 +203,10 @@ public class GameListener implements Listener {
 			}
 			Block block = event.getBlock();
 			event.setCancelled(true);
+
+			if (isIndestructible(block.getType())) {
+				return;
+			}
 
 			Team farmOwner = farmGlassOwner(block.getType());
 			if (farmOwner != null) {
@@ -323,6 +314,9 @@ public class GameListener implements Listener {
 	 */
 	private boolean degrade(Block hit) {
 		Material type = hit.getType();
+		if (isIndestructible(type)) {
+			return false;
+		}
 		if (farmGlassOwner(type) != null) {
 			// an infinite farming block: arrows just bounce off it, mining is the only way to harvest it
 			return false;
@@ -362,6 +356,19 @@ public class GameListener implements Listener {
 
 	private boolean isStainedGlass(Material m) {
 		return m.name().endsWith("_STAINED_GLASS");
+	}
+
+	/** Map-decoration/structural blocks that can't be broken at all, by anyone, through any means, while a game is on. */
+	private static final java.util.Set<Material> INDESTRUCTIBLE = java.util.EnumSet.of(
+			Material.BLUE_GLAZED_TERRACOTTA,
+			Material.BLACK_GLAZED_TERRACOTTA,
+			Material.RED_GLAZED_TERRACOTTA,
+			Material.LIGHT_BLUE_GLAZED_TERRACOTTA,
+			Material.POLISHED_SULFUR_SLAB,
+			Material.DARK_PRISMARINE_SLAB);
+
+	private boolean isIndestructible(Material m) {
+		return INDESTRUCTIBLE.contains(m);
 	}
 
 	/**
