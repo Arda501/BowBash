@@ -20,6 +20,7 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
+import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerEggThrowEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -128,6 +129,31 @@ public class GameListener implements Listener {
 		if (arenaOf(event.getPlayer()).isPresent()) {
 			event.setCancelled(true);
 		}
+	}
+
+	/** Command names allowed for a rostered player while their arena is INGAME, besides admins (who are never restricted). */
+	private static final java.util.Set<String> ALLOWED_COMMANDS_INGAME = java.util.Set.of("help", "matrix");
+
+	@EventHandler
+	public void onCommand(PlayerCommandPreprocessEvent event) {
+		Player p = event.getPlayer();
+		if (p.hasPermission("bowbash.admin")) {
+			return;
+		}
+		arenaOf(p).ifPresent(a -> {
+			if (!a.isInGame()) {
+				return;
+			}
+			String label = event.getMessage().substring(1).split(" ", 2)[0].toLowerCase();
+			int colon = label.indexOf(':'); // strip a "plugin:command" prefix, e.g. "bowbash:help"
+			if (colon >= 0) {
+				label = label.substring(colon + 1);
+			}
+			if (!ALLOWED_COMMANDS_INGAME.contains(label)) {
+				event.setCancelled(true);
+				p.sendMessage(org.bukkit.ChatColor.RED + "Commands are disabled during a match.");
+			}
+		});
 	}
 
 	@EventHandler

@@ -43,6 +43,11 @@ public class Main extends JavaPlugin {
 
 		Bukkit.getScheduler().runTaskTimer(this, () -> arenaManager.tickAll(LOBBY_TICK_INTERVAL), LOBBY_TICK_INTERVAL, LOBBY_TICK_INTERVAL);
 
+		if (Bukkit.getPluginManager().getPlugin("PlaceholderAPI") != null) {
+			new BowBashPlaceholders(this).register();
+			getLogger().info("PlaceholderAPI found - %bowbash_...% placeholders registered.");
+		}
+
 		getLogger().info("BowBash enabled.");
 	}
 

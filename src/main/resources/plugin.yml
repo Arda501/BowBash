@@ -5,6 +5,7 @@ api-version: '26.2'
 author: InstanceLabs
 description: Bash others off the platform by shooting the blocks out from under them.
 website: https://github.com/MysticCity/BowBash
+softdepend: [PlaceholderAPI]
 commands:
   bb:
     description: BowBash main command

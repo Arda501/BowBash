@@ -94,6 +94,32 @@ team's colour, launched over the arena's lobby.
 (mining, arrows, egg/snowball explosions) while a game is on — useful for map
 borders, decoration, or anything else that should never come apart.
 
+While a round is actually in progress, a non-admin player can't use any command
+except `/help` and `/matrix` — everything else is silently blocked. Players with
+`bowbash.admin` are never restricted.
+
+Displaying live stats (signs, scoreboards, ...)
+------------------------------------------------
+
+If [PlaceholderAPI](https://www.spigotmc.org/resources/placeholderapi.6245/) is
+installed, BowBash registers its own placeholders on startup (nothing to
+configure) - any PAPI-aware plugin can then show live stats for whichever arena
+the *viewing* player is currently in, including on a sign via
+[SignManager](https://modrinth.com/plugin/signmanager)
+(`/sign edit line 1 %bowbash_map%`, refreshed automatically at whatever interval
+you've set with `/sign admin interval`), a scoreboard plugin, or chat formatting.
+Since BowBash is multi-arena, these are always relative to the requesting player,
+not global — a player not currently in any arena sees `-` for all of them:
+
+| Placeholder | Value |
+|---|---|
+| `%bowbash_time%` | "M:SS" elapsed since the viewer's round went in-game, or `-` |
+| `%bowbash_red_score%` / `%bowbash_blue_score%` | the viewer's arena's current scores, or `-` |
+| `%bowbash_map%` | the viewer's arena's name, or `-` |
+
+No PlaceholderAPI installed? BowBash just skips registering them - everything
+else works the same either way.
+
 Links
 -----
 
