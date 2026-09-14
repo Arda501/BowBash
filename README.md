@@ -123,6 +123,16 @@ not global — a player not currently in any arena sees `-` for all of them:
 No PlaceholderAPI installed? BowBash just skips registering them - everything
 else works the same either way.
 
+License
+-------
+
+Licensed under [Creative Commons Attribution-NonCommercial 4.0 International](https://creativecommons.org/licenses/by-nc/4.0/)
+(CC BY-NC 4.0) - see [LICENSE](LICENSE). You're free to use, share, and modify
+this plugin for non-commercial purposes, with credit. This project is itself a
+derivative of the original [MysticCity/BowBash](https://github.com/MysticCity/BowBash),
+ported and substantially rewritten for modern (26.2) Minecraft/Paper - credit
+that original project as well as this one.
+
 Links
 -----
 
