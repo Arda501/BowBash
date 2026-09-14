@@ -121,7 +121,10 @@ public class MapSnapshot {
 	}
 
 	private void restoreContainer(Block block, int index) {
-		BlockState state = block.getState();
+		// Deliberately non-snapshot (live): plain getState() here - even combined with restoring
+		// container contents only after every block's BlockData is set - was observed (verified via
+		// a live console test) to silently discard the inventory write.
+		BlockState state = block.getState(false);
 		if (!(state instanceof InventoryHolder holder)) {
 			return;
 		}
