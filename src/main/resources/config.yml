@@ -1,0 +1,18 @@
+# BowBash configuration
+
+config:
+  # chance (percent) each powerup tick that a powerup spawns above a random in-game player
+  powerup_spawn_percentage: 10
+  # how often (in seconds) powerups are checked/spawned during a game
+  powerup_interval_seconds: 3
+  # radius (in blocks, x/z) around a spawn platform that cannot be broken/protected from block-shooting
+  unlimited_glass_radius: 2
+  # give players colored leather armor matching their team when the game starts
+  automatically_add_colored_bowbash_armor: true
+  # seconds of lobby countdown once minimum players have joined
+  lobby_countdown_seconds: 30
+  # default minimum/maximum players for newly created arenas
+  default_min_players: 4
+  default_max_players: 8
+  # default starting score (lives) per team if an arena doesn't override it
+  default_score: 4

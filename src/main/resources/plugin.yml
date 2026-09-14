@@ -1,12 +1,19 @@
-name: MGBowBash
+name: BowBash
 main: com.comze_instancelabs.bowbash.Main
-version: ${minigames.releaseversion}-${minigames.timestamp}
-author: [InstanceLabs,mepeisen]
-softdepend: [Vault, MinigamesLib]
-depend: [MinigamesLib]
-loadbefore: [MinigamesLib]
+version: ${project.version}
+api-version: '26.2'
+author: InstanceLabs
+description: Bash others off the platform by shooting the blocks out from under them.
+website: https://github.com/MysticCity/BowBash
 commands:
-   bb:
-      description: Main command
-      usage: /bb [action]
-      aliases: [bowbash, mgbowbash]
+  bb:
+    description: BowBash main command
+    usage: /bb <join|leave|list|create|remove|setspawn|setlobby|setsign|setminplayers|setmaxplayers|start|help> [args]
+    aliases: [bowbash]
+permissions:
+  bowbash.play:
+    description: Allows joining BowBash arenas
+    default: true
+  bowbash.admin:
+    description: Allows setting up and administrating BowBash arenas
+    default: op
