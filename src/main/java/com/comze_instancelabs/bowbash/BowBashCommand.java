@@ -38,8 +38,6 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			case "remove", "delete" -> admin(sender, args, this::remove);
 			case "setlobby" -> admin(sender, args, this::setLobby);
 			case "setspawn" -> admin(sender, args, this::setSpawn);
-			case "setminplayers" -> admin(sender, args, this::setMinPlayers);
-			case "setmaxplayers" -> admin(sender, args, this::setMaxPlayers);
 			case "setdefaultscore" -> admin(sender, args, this::setDefaultScore);
 			case "stop" -> admin(sender, args, this::forceStop);
 			default -> sendHelp(sender);
@@ -69,7 +67,7 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			return;
 		}
 		if (args.length < 2) {
-			p.sendMessage(ChatColor.RED + "Usage: /bb join <arena>");
+			p.sendMessage(ChatColor.RED + "Usage: /bb join <arena> [red|blue]");
 			return;
 		}
 		Arena arena = plugin.getArenaManager().get(args[1]);
@@ -77,7 +75,18 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			p.sendMessage(ChatColor.RED + "No such arena: " + args[1]);
 			return;
 		}
-		String error = arena.join(p);
+		Team team = null;
+		if (args.length > 2) {
+			if (args[2].equalsIgnoreCase("red")) {
+				team = Team.RED;
+			} else if (args[2].equalsIgnoreCase("blue")) {
+				team = Team.BLUE;
+			} else {
+				p.sendMessage(ChatColor.RED + "Team must be 'red' or 'blue'.");
+				return;
+			}
+		}
+		String error = arena.join(p, team);
 		if (error != null) {
 			p.sendMessage(error);
 		}
@@ -97,7 +106,7 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			return;
 		}
 		String names = plugin.getArenaManager().getAll().stream()
-				.map(a -> a.getName() + ChatColor.GRAY + "(" + a.getPlayers().size() + "/" + a.getMaxPlayers() + ")" + ChatColor.RESET)
+				.map(a -> a.getName() + ChatColor.GRAY + "(" + a.countTeam(Team.RED) + " red / " + a.countTeam(Team.BLUE) + " blue)" + ChatColor.RESET)
 				.collect(Collectors.joining(ChatColor.GRAY + ", " + ChatColor.WHITE));
 		sender.sendMessage(ChatColor.AQUA + "Arenas: " + ChatColor.WHITE + names);
 	}
@@ -146,22 +155,6 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			arena.setSpawn(team, p.getLocation());
 			plugin.getArenaManager().save();
 			p.sendMessage(ChatColor.GREEN + team.name() + " spawn for '" + arena.getName() + "' set to your location.");
-		});
-	}
-
-	private void setMinPlayers(Player p, String[] args) {
-		withIntArg(p, args, "setminplayers", (arena, n) -> {
-			arena.setMinPlayers(n);
-			plugin.getArenaManager().save();
-			p.sendMessage(ChatColor.GREEN + "Minimum players for '" + arena.getName() + "' set to " + n + ".");
-		});
-	}
-
-	private void setMaxPlayers(Player p, String[] args) {
-		withIntArg(p, args, "setmaxplayers", (arena, n) -> {
-			arena.setMaxPlayers(n);
-			plugin.getArenaManager().save();
-			p.sendMessage(ChatColor.GREEN + "Maximum players for '" + arena.getName() + "' set to " + n + ".");
 		});
 	}
 
@@ -220,15 +213,16 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 
 	private void sendHelp(CommandSender sender) {
 		sender.sendMessage(ChatColor.AQUA + "" + ChatColor.BOLD + "BowBash");
-		sender.sendMessage(ChatColor.GRAY + "/bb join <arena>" + ChatColor.DARK_GRAY + " - join a game");
+		sender.sendMessage(ChatColor.GRAY + "/bb join <arena> [red|blue]" + ChatColor.DARK_GRAY + " - join a game (omit the team to auto-balance)");
 		sender.sendMessage(ChatColor.GRAY + "/bb leave" + ChatColor.DARK_GRAY + " - leave your current game");
 		sender.sendMessage(ChatColor.GRAY + "/bb list" + ChatColor.DARK_GRAY + " - list arenas");
+		sender.sendMessage(ChatColor.DARK_GRAY + "Right-click your item in the lobby to ready up - the game starts once both teams are equal size and everyone's ready.");
 		if (sender.hasPermission("bowbash.admin")) {
 			sender.sendMessage(ChatColor.GRAY + "/bb create <arena>");
 			sender.sendMessage(ChatColor.GRAY + "/bb remove <arena>");
 			sender.sendMessage(ChatColor.GRAY + "/bb setlobby <arena>");
 			sender.sendMessage(ChatColor.GRAY + "/bb setspawn <arena> <red|blue>");
-			sender.sendMessage(ChatColor.GRAY + "/bb setminplayers|setmaxplayers|setdefaultscore <arena> <n>");
+			sender.sendMessage(ChatColor.GRAY + "/bb setdefaultscore <arena> <n>");
 			sender.sendMessage(ChatColor.GRAY + "/bb stop <arena>");
 		}
 	}
@@ -239,13 +233,13 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 		if (args.length == 1) {
 			options.addAll(List.of("join", "leave", "list", "help"));
 			if (sender.hasPermission("bowbash.admin")) {
-				options.addAll(List.of("create", "remove", "setlobby", "setspawn", "setminplayers", "setmaxplayers", "setdefaultscore", "stop"));
+				options.addAll(List.of("create", "remove", "setlobby", "setspawn", "setdefaultscore", "stop"));
 			}
 		} else if (args.length == 2) {
 			for (Arena arena : plugin.getArenaManager().getAll()) {
 				options.add(arena.getName());
 			}
-		} else if (args.length == 3 && args[0].equalsIgnoreCase("setspawn")) {
+		} else if (args.length == 3 && (args[0].equalsIgnoreCase("setspawn") || args[0].equalsIgnoreCase("join"))) {
 			options.addAll(List.of("red", "blue"));
 		}
 		String current = args[args.length - 1].toLowerCase();

@@ -16,6 +16,12 @@ import org.bukkit.scheduler.BukkitTask;
 /**
  * A single BowBash arena: its configured locations plus the live state of whatever match (if any)
  * is currently running in it.
+ *
+ * <p>The lobby doesn't wait for a fixed player count. Anyone can join either team at any time
+ * (no maximum); once both teams are non-empty and the same size, and every rostered player has
+ * right-clicked their {@link ReadyItem ready item}, a short countdown starts automatically. The
+ * countdown aborts immediately back to {@link ArenaState#WAITING} if a team becomes uneven or
+ * unready again before it finishes - see {@link #tick()}.
  */
 public class Arena {
 
@@ -26,32 +32,29 @@ public class Arena {
 	private Location lobby;
 	private final Location[] spawns = new Location[2]; // 0 = red, 1 = blue
 
-	private int minPlayers;
-	private int maxPlayers;
 	private int defaultScore;
 
 	private ArenaState state = ArenaState.WAITING;
 
 	private final LinkedHashSet<UUID> players = new LinkedHashSet<>();
 	private final Map<UUID, Team> playerTeam = new LinkedHashMap<>();
+	private final Set<UUID> readyPlayers = new LinkedHashSet<>();
 	private final Map<UUID, Integer> blocksBrokenThisGame = new LinkedHashMap<>();
 	private final Set<Team> teamWasAtOne = EnumSet.noneOf(Team.class);
-	private boolean nextJoinRed = true;
 
 	private int redScore;
 	private int blueScore;
 
-	private BukkitTask countdownTask;
+	/** Ticks remaining in the ready countdown, counted down by {@link #tick()}; -1 = not counting down. */
+	private int countdownTicksRemaining = -1;
+
 	private BukkitTask powerupTask;
-	private int countdownSecondsRemaining;
 
 	private final BlockRegen regen = new BlockRegen();
 
 	public Arena(Main plugin, String name) {
 		this.plugin = plugin;
 		this.name = name;
-		this.minPlayers = plugin.getConfig().getInt("config.default_min_players", 4);
-		this.maxPlayers = plugin.getConfig().getInt("config.default_max_players", 8);
 		this.defaultScore = plugin.getConfig().getInt("config.default_score", 4);
 	}
 
@@ -89,22 +92,6 @@ public class Arena {
 		return lobby != null && spawns[0] != null && spawns[1] != null;
 	}
 
-	public int getMinPlayers() {
-		return minPlayers;
-	}
-
-	public void setMinPlayers(int minPlayers) {
-		this.minPlayers = minPlayers;
-	}
-
-	public int getMaxPlayers() {
-		return maxPlayers;
-	}
-
-	public void setMaxPlayers(int maxPlayers) {
-		this.maxPlayers = maxPlayers;
-	}
-
 	public int getDefaultScore() {
 		return defaultScore;
 	}
@@ -125,6 +112,20 @@ public class Arena {
 		return playerTeam.get(uuid);
 	}
 
+	public boolean isReady(UUID uuid) {
+		return readyPlayers.contains(uuid);
+	}
+
+	public int countTeam(Team team) {
+		int n = 0;
+		for (Team t : playerTeam.values()) {
+			if (t == team) {
+				n++;
+			}
+		}
+		return n;
+	}
+
 	public int getRedScore() {
 		return redScore;
 	}
@@ -137,6 +138,10 @@ public class Arena {
 		return team == Team.RED ? redScore : blueScore;
 	}
 
+	public int getCountdownSecondsRemaining() {
+		return countdownTicksRemaining < 0 ? -1 : countdownTicksRemaining / 20;
+	}
+
 	public BlockRegen getRegen() {
 		return regen;
 	}
@@ -147,38 +152,33 @@ public class Arena {
 
 	// --- join / leave ------------------------------------------------------
 
-	public boolean isFull() {
-		return players.size() >= maxPlayers;
-	}
-
-	public String join(Player p) {
+	/**
+	 * @param preferredTeam team to join, or {@code null} to auto-pick whichever team currently has
+	 *                      fewer players (red on a tie)
+	 * @return an error message to show the player, or {@code null} on success
+	 */
+	public String join(Player p, Team preferredTeam) {
 		if (!isFullyConfigured()) {
 			return ChatColor.RED + "This arena isn't fully set up yet.";
 		}
 		if (state == ArenaState.INGAME || state == ArenaState.ENDING) {
 			return ChatColor.RED + "That game has already started.";
 		}
-		if (isFull()) {
-			return ChatColor.RED + "That arena is full.";
-		}
 		if (players.contains(p.getUniqueId())) {
 			return ChatColor.RED + "You're already in that arena.";
 		}
 
+		Team team = preferredTeam != null ? preferredTeam : (countTeam(Team.RED) <= countTeam(Team.BLUE) ? Team.RED : Team.BLUE);
+
 		players.add(p.getUniqueId());
-		Team team = nextJoinRed ? Team.RED : Team.BLUE;
-		nextJoinRed = !nextJoinRed;
 		playerTeam.put(p.getUniqueId(), team);
 		blocksBrokenThisGame.put(p.getUniqueId(), 0);
 
 		p.teleport(lobby);
-		Kit.clearAndGiveLobbyState(p);
-		broadcast(team.chatColor() + p.getName() + ChatColor.GRAY + " joined (" + players.size() + "/" + maxPlayers + ")");
+		giveReadyItem(p);
+		broadcast(team.chatColor() + p.getName() + ChatColor.GRAY + " joined " + team.chatColor() + team.name() + ChatColor.GRAY
+				+ " (" + countTeam(Team.RED) + " red / " + countTeam(Team.BLUE) + " blue). Right-click your item when ready!");
 		plugin.getScoreboardManager().updateLobby(this);
-
-		if (state == ArenaState.WAITING && players.size() >= minPlayers) {
-			startCountdown();
-		}
 		return null;
 	}
 
@@ -195,8 +195,10 @@ public class Arena {
 
 		players.remove(id);
 		playerTeam.remove(id);
+		readyPlayers.remove(id);
 		blocksBrokenThisGame.remove(id);
 		plugin.getKit().removeArmor(p);
+		p.getInventory().clear();
 		p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
 
 		if (!silent) {
@@ -207,9 +209,7 @@ public class Arena {
 		}
 
 		if (state == ArenaState.WAITING || state == ArenaState.STARTING) {
-			if (players.size() < minPlayers) {
-				cancelCountdown();
-			}
+			recheckLobby();
 		}
 		plugin.getScoreboardManager().updateLobby(this);
 	}
@@ -222,49 +222,149 @@ public class Arena {
 			} else {
 				players.remove(id);
 				playerTeam.remove(id);
+				readyPlayers.remove(id);
 			}
 		}
 	}
 
-	// --- lobby countdown -----------------------------------------------------
+	// --- ready up ------------------------------------------------------------
 
-	private void startCountdown() {
+	private void giveReadyItem(Player p) {
+		p.getInventory().clear();
+		p.getInventory().setItem(ReadyItem.SLOT, ReadyItem.notReady(plugin));
+	}
+
+	/** Right-clicking the ready item calls this. */
+	public void toggleReady(Player p) {
+		UUID id = p.getUniqueId();
+		if (!playerTeam.containsKey(id)) {
+			return;
+		}
+		if (readyPlayers.remove(id)) {
+			p.getInventory().setItem(ReadyItem.SLOT, ReadyItem.notReady(plugin));
+			if (state == ArenaState.STARTING) {
+				abortCountdown(p.getName() + " is no longer ready");
+			}
+		} else {
+			readyPlayers.add(id);
+			p.getInventory().setItem(ReadyItem.SLOT, ReadyItem.ready(plugin));
+			recheckLobby();
+		}
+		plugin.getScoreboardManager().updateLobby(this);
+	}
+
+	/** Self-healing: keeps the ready item pinned to its slot for everyone currently waiting. */
+	private void enforceReadyItems() {
+		for (UUID id : players) {
+			Player p = Bukkit.getPlayer(id);
+			if (p == null) {
+				continue;
+			}
+			var inv = p.getInventory();
+			boolean ready = readyPlayers.contains(id);
+			for (int slot = 0; slot < inv.getSize(); slot++) {
+				if (slot == ReadyItem.SLOT) {
+					continue;
+				}
+				if (ReadyItem.isReadyItem(plugin, inv.getItem(slot))) {
+					inv.setItem(slot, null);
+				}
+			}
+			var current = inv.getItem(ReadyItem.SLOT);
+			boolean correct = ReadyItem.isReadyItem(plugin, current) && current.getType() == (ready ? org.bukkit.Material.LIME_DYE : org.bukkit.Material.GRAY_DYE);
+			if (!correct) {
+				inv.setItem(ReadyItem.SLOT, ready ? ReadyItem.ready(plugin) : ReadyItem.notReady(plugin));
+			}
+		}
+	}
+
+	private boolean allReady() {
+		for (UUID id : players) {
+			if (!readyPlayers.contains(id)) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private boolean teamsBalancedAndReady() {
+		int red = countTeam(Team.RED);
+		int blue = countTeam(Team.BLUE);
+		return red >= 1 && red == blue && allReady();
+	}
+
+	/**
+	 * Checked whenever someone readies up, leaves, or disconnects: if both teams are non-empty and
+	 * even, and everyone's ready, kicks off the countdown. If the teams are non-empty but uneven,
+	 * says so instead of silently doing nothing.
+	 */
+	private void recheckLobby() {
 		if (state != ArenaState.WAITING) {
 			return;
 		}
+		int red = countTeam(Team.RED);
+		int blue = countTeam(Team.BLUE);
+		if (red == 0 && blue == 0) {
+			return;
+		}
+		if (red != blue) {
+			broadcast(ChatColor.RED + "Teams must be the same size to start (currently " + Team.RED.chatColor() + "Red " + red
+					+ ChatColor.RED + " / " + Team.BLUE.chatColor() + "Blue " + blue + ChatColor.RED + ").");
+			return;
+		}
+		if (!allReady()) {
+			return;
+		}
 		state = ArenaState.STARTING;
-		countdownSecondsRemaining = plugin.getConfig().getInt("config.lobby_countdown_seconds", 30);
-		countdownTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-			if (countdownSecondsRemaining <= 0) {
-				start();
-				return;
-			}
-			if (countdownSecondsRemaining <= 5 || countdownSecondsRemaining % 10 == 0) {
-				broadcast(ChatColor.YELLOW + "Game starting in " + countdownSecondsRemaining + "...");
-			}
-			plugin.getScoreboardManager().updateLobby(this);
-			countdownSecondsRemaining--;
-		}, 0L, 20L);
+		countdownTicksRemaining = plugin.getConfig().getInt("config.lobby_countdown_seconds", 10) * 20;
+		broadcast(ChatColor.GREEN + "All ready - starting in " + (countdownTicksRemaining / 20) + "s!");
+		plugin.getScoreboardManager().updateLobby(this);
 	}
 
-	private void cancelCountdown() {
-		if (countdownTask != null) {
-			countdownTask.cancel();
-			countdownTask = null;
+	private void abortCountdown(String reason) {
+		if (state != ArenaState.STARTING) {
+			return;
 		}
-		if (state == ArenaState.STARTING) {
-			state = ArenaState.WAITING;
-			broadcast(ChatColor.RED + "Not enough players, countdown cancelled.");
-			plugin.getScoreboardManager().updateLobby(this);
+		state = ArenaState.WAITING;
+		countdownTicksRemaining = -1;
+		broadcast(ChatColor.RED + "Countdown cancelled - " + reason);
+		plugin.getScoreboardManager().updateLobby(this);
+	}
+
+	/**
+	 * Called on a fixed schedule (every few ticks, regardless of arena state) by {@link ArenaManager#tickAll()}.
+	 * Re-validates the countdown's conditions every call so it aborts immediately (not just at the
+	 * next second boundary) the moment a team becomes uneven or someone un-readies.
+	 */
+	public void tick(int tickIntervalTicks) {
+		if (state != ArenaState.WAITING && state != ArenaState.STARTING) {
+			return;
 		}
+		enforceReadyItems();
+		if (state != ArenaState.STARTING) {
+			return;
+		}
+		if (!teamsBalancedAndReady()) {
+			abortCountdown("the team/ready conditions are no longer met");
+			return;
+		}
+		if (countdownTicksRemaining <= 0) {
+			countdownTicksRemaining = -1;
+			start();
+			return;
+		}
+		if (countdownTicksRemaining % 20 == 0) {
+			broadcast(ChatColor.YELLOW + Integer.toString(countdownTicksRemaining / 20) + "...");
+		}
+		countdownTicksRemaining -= tickIntervalTicks;
 	}
 
 	// --- game lifecycle --------------------------------------------------------
 
 	private void start() {
-		cancelCountdown();
 		state = ArenaState.INGAME;
 		teamWasAtOne.clear();
+		readyPlayers.clear();
 
 		int startingScore = defaultScore;
 		redScore = startingScore;
@@ -390,22 +490,19 @@ public class Arena {
 		}
 		players.clear();
 		playerTeam.clear();
+		readyPlayers.clear();
 		blocksBrokenThisGame.clear();
 		teamWasAtOne.clear();
-		nextJoinRed = true;
 		state = ArenaState.WAITING;
 	}
 
 	/** Force-stops the arena immediately, e.g. from an admin command or plugin shutdown. */
 	public void forceStop() {
-		if (countdownTask != null) {
-			countdownTask.cancel();
-			countdownTask = null;
-		}
 		if (powerupTask != null) {
 			powerupTask.cancel();
 			powerupTask = null;
 		}
+		countdownTicksRemaining = -1;
 		boolean wasRunning = state == ArenaState.INGAME || state == ArenaState.STARTING;
 		if (wasRunning) {
 			broadcast(ChatColor.RED + "The game was stopped.");

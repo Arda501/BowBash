@@ -5,6 +5,9 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
 
+	/** How often (in ticks) each arena's lobby/countdown logic re-checks itself. */
+	private static final int LOBBY_TICK_INTERVAL = 5;
+
 	private ArenaManager arenaManager;
 	private BowBashScoreboard scoreboardManager;
 	private Kit kit;
@@ -27,6 +30,8 @@ public class Main extends JavaPlugin {
 		BowBashCommand command = new BowBashCommand(this);
 		getCommand("bb").setExecutor(command);
 		getCommand("bb").setTabCompleter(command);
+
+		Bukkit.getScheduler().runTaskTimer(this, () -> arenaManager.tickAll(LOBBY_TICK_INTERVAL), LOBBY_TICK_INTERVAL, LOBBY_TICK_INTERVAL);
 
 		getLogger().info("BowBash enabled.");
 	}

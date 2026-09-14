@@ -25,8 +25,13 @@ public class BowBashScoreboard {
 
 	public void updateLobby(Arena arena) {
 		List<String> lines = new ArrayList<>();
-		lines.add(ChatColor.GRAY + "Players: " + ChatColor.WHITE + arena.getPlayers().size() + "/" + arena.getMaxPlayers());
-		lines.add(ChatColor.GRAY + "State: " + ChatColor.WHITE + arena.getState().name());
+		lines.add(Team.RED.chatColor() + "Red: " + ChatColor.WHITE + arena.countTeam(Team.RED));
+		lines.add(Team.BLUE.chatColor() + "Blue: " + ChatColor.WHITE + arena.countTeam(Team.BLUE));
+		if (arena.getState() == ArenaState.STARTING) {
+			lines.add(ChatColor.YELLOW + "Starting: " + ChatColor.WHITE + arena.getCountdownSecondsRemaining() + "s");
+		} else {
+			lines.add(ChatColor.GRAY + "Waiting for ready players");
+		}
 		render(arena, ChatColor.AQUA + "" + ChatColor.BOLD + arena.getName(), lines);
 	}
 

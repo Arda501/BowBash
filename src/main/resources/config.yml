@@ -9,10 +9,7 @@ config:
   unlimited_glass_radius: 2
   # give players colored leather armor matching their team when the game starts
   automatically_add_colored_bowbash_armor: true
-  # seconds of lobby countdown once minimum players have joined
-  lobby_countdown_seconds: 30
-  # default minimum/maximum players for newly created arenas
-  default_min_players: 4
-  default_max_players: 8
+  # seconds of countdown once both teams are the same size (at least 1 each) and everyone's ready
+  lobby_countdown_seconds: 10
   # default starting score (lives) per team if an arena doesn't override it
   default_score: 4

@@ -43,8 +43,6 @@ public class ArenaManager {
 			arena.setLobby(stringToLoc(config.getString(base + "lobby")));
 			arena.setSpawn(Team.RED, stringToLoc(config.getString(base + "spawn_red")));
 			arena.setSpawn(Team.BLUE, stringToLoc(config.getString(base + "spawn_blue")));
-			arena.setMinPlayers(config.getInt(base + "min_players", arena.getMinPlayers()));
-			arena.setMaxPlayers(config.getInt(base + "max_players", arena.getMaxPlayers()));
 			arena.setDefaultScore(config.getInt(base + "default_score", arena.getDefaultScore()));
 			arenas.put(name.toLowerCase(), arena);
 		}
@@ -59,8 +57,6 @@ public class ArenaManager {
 			config.set(base + "lobby", locToString(arena.getLobby()));
 			config.set(base + "spawn_red", locToString(arena.getSpawn(Team.RED)));
 			config.set(base + "spawn_blue", locToString(arena.getSpawn(Team.BLUE)));
-			config.set(base + "min_players", arena.getMinPlayers());
-			config.set(base + "max_players", arena.getMaxPlayers());
 			config.set(base + "default_score", arena.getDefaultScore());
 		}
 		try {
@@ -104,6 +100,13 @@ public class ArenaManager {
 	public void stopAll() {
 		for (Arena arena : arenas.values()) {
 			arena.forceStop();
+		}
+	}
+
+	/** Drives every arena's lobby/countdown logic; see {@link Arena#tick(int)}. */
+	public void tickAll(int tickIntervalTicks) {
+		for (Arena arena : arenas.values()) {
+			arena.tick(tickIntervalTicks);
 		}
 	}
 

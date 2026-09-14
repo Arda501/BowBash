@@ -40,13 +40,14 @@ That's the minimum to make an arena joinable. Optional:
 /bb stop <arena>              # force-stop and reset a running/stuck arena
 ```
 
-Players join with `/bb join <arena>` (or `/bb list` to see what's available), or by
-right-clicking a sign whose first line reads `[BowBash]` and second line names the
-arena.
+Players join with `/bb join <arena> [red|blue]` (omit the team to auto-balance),
+or by right-clicking a sign whose first line reads `[BowBash]` and second line
+names the arena. There's no minimum or maximum player count.
 
-Once enough players have joined, a countdown starts automatically and the match
-begins. Any blocks destroyed during the match are automatically restored when it
-ends.
+Joining hands you a "Not Ready" item — right-click it to ready up. As soon as both
+teams are the same size (at least 1 each) and everyone's ready, a short countdown
+starts automatically; un-readying, or a team becoming uneven, cancels it instantly.
+Any blocks destroyed during the match are automatically restored when it ends.
 
 Links
 -----

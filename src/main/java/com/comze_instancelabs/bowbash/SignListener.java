@@ -51,7 +51,7 @@ public class SignListener implements Listener {
 		if (arena.getPlayers().contains(p.getUniqueId())) {
 			arena.leave(p, false);
 		} else {
-			String error = arena.join(p);
+			String error = arena.join(p, null);
 			if (error != null) {
 				p.sendMessage(error);
 			}

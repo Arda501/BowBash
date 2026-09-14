@@ -116,9 +116,26 @@ public class GameListener implements Listener {
 
 	@EventHandler
 	public void onPlayerDropItem(PlayerDropItemEvent event) {
-		arenaOf(event.getPlayer()).ifPresent(a -> {
-			if (a.isInGame()) {
+		// nothing dropped by an arena player is ever supposed to leave their inventory: the lobby
+		// ready item is pinned in place, and in-game kit items shouldn't be discardable either.
+		if (arenaOf(event.getPlayer()).isPresent()) {
+			event.setCancelled(true);
+		}
+	}
+
+	@EventHandler
+	public void onReadyItemUse(PlayerInteractEvent event) {
+		if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+			return;
+		}
+		Player p = event.getPlayer();
+		if (!ReadyItem.isReadyItem(plugin, event.getItem())) {
+			return;
+		}
+		arenaOf(p).ifPresent(a -> {
+			if (a.getState() == ArenaState.WAITING || a.getState() == ArenaState.STARTING) {
 				event.setCancelled(true);
+				a.toggleReady(p);
 			}
 		});
 	}
