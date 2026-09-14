@@ -9,7 +9,12 @@ import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
+import org.bukkit.GameMode;
 import org.bukkit.Location;
+import org.bukkit.Particle;
+import org.bukkit.Sound;
+import org.bukkit.SoundCategory;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -31,6 +36,9 @@ public class Arena {
 	private String worldName;
 	private Location lobby;
 	private final Location[] spawns = new Location[2]; // 0 = red, 1 = blue
+	/** The arena's bounding box corners, used to snapshot/restore the whole map each round - see {@link #snapshot}. */
+	private Location pos1;
+	private Location pos2;
 
 	private int defaultScore;
 
@@ -50,7 +58,7 @@ public class Arena {
 
 	private BukkitTask powerupTask;
 
-	private final BlockRegen regen = new BlockRegen();
+	private final MapSnapshot snapshot = new MapSnapshot();
 
 	public Arena(Main plugin, String name) {
 		this.plugin = plugin;
@@ -88,8 +96,24 @@ public class Arena {
 		spawns[team.spawnIndex()] = location;
 	}
 
+	public Location getPos1() {
+		return pos1;
+	}
+
+	public void setPos1(Location pos1) {
+		this.pos1 = pos1;
+	}
+
+	public Location getPos2() {
+		return pos2;
+	}
+
+	public void setPos2(Location pos2) {
+		this.pos2 = pos2;
+	}
+
 	public boolean isFullyConfigured() {
-		return lobby != null && spawns[0] != null && spawns[1] != null;
+		return lobby != null && spawns[0] != null && spawns[1] != null && pos1 != null && pos2 != null;
 	}
 
 	public int getDefaultScore() {
@@ -142,10 +166,6 @@ public class Arena {
 		return countdownTicksRemaining < 0 ? -1 : countdownTicksRemaining / 20;
 	}
 
-	public BlockRegen getRegen() {
-		return regen;
-	}
-
 	public boolean isInGame() {
 		return state == ArenaState.INGAME;
 	}
@@ -175,6 +195,7 @@ public class Arena {
 		blocksBrokenThisGame.put(p.getUniqueId(), 0);
 
 		p.teleport(lobby);
+		p.setGameMode(GameMode.ADVENTURE);
 		giveReadyItem(p);
 		broadcast(team.chatColor() + p.getName() + ChatColor.GRAY + " joined " + team.chatColor() + team.name() + ChatColor.GRAY
 				+ " (" + countTeam(Team.RED) + " red / " + countTeam(Team.BLUE) + " blue). Right-click your item when ready!");
@@ -201,6 +222,7 @@ public class Arena {
 		plugin.getKit().removeArmor(p);
 		p.getInventory().clear();
 		p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+		p.setGameMode(GameMode.ADVENTURE);
 
 		if (!silent) {
 			p.teleport(p.getWorld().getSpawnLocation());
@@ -366,6 +388,7 @@ public class Arena {
 		state = ArenaState.INGAME;
 		teamWasAtOne.clear();
 		readyPlayers.clear();
+		snapshot.capture(pos1, pos2);
 
 		int startingScore = defaultScore;
 		redScore = startingScore;
@@ -378,6 +401,7 @@ public class Arena {
 			}
 			Team team = playerTeam.get(id);
 			p.teleport(spawns[team.spawnIndex()]);
+			p.setGameMode(GameMode.SURVIVAL);
 			plugin.getKit().giveKit(p, team);
 			blocksBrokenThisGame.put(id, 0);
 		}
@@ -453,12 +477,23 @@ public class Arena {
 			}
 		}
 
+		playSoundToArena(Sound.ENTITY_EXPERIENCE_ORB_PICKUP, 1.2F);
+
 		if (getScore(fallenTeam) < 1) {
 			end(winningSideIfEliminated);
 			return;
 		}
 
 		plugin.getScoreboardManager().updateInGame(this);
+	}
+
+	private void playSoundToArena(Sound sound, float pitch) {
+		for (UUID id : players) {
+			Player p = Bukkit.getPlayer(id);
+			if (p != null) {
+				p.playSound(p.getLocation(), sound, SoundCategory.MASTER, 1.0F, pitch);
+			}
+		}
 	}
 
 	public void onBlockBroken(UUID player) {
@@ -492,17 +527,22 @@ public class Arena {
 			powerupTask = null;
 		}
 
-		Bukkit.getScheduler().runTaskLater(plugin, this::reset, 100L);
+		Bukkit.getScheduler().runTaskLater(plugin, () -> {
+			reset();
+			playVictoryCelebration();
+		}, 100L);
 	}
 
+	/** Restores the map to its pre-round snapshot, sends everyone back to the lobby, and re-arms for the next round. */
 	private void reset() {
-		regen.revertAll();
+		snapshot.restore();
 		for (UUID id : new LinkedHashSet<>(players)) {
 			Player p = Bukkit.getPlayer(id);
 			if (p != null) {
 				plugin.getKit().removeArmor(p);
 				p.getInventory().clear();
 				p.setScoreboard(Bukkit.getScoreboardManager().getMainScoreboard());
+				p.setGameMode(GameMode.ADVENTURE);
 				p.teleport(p.getWorld().getSpawnLocation());
 			}
 		}
@@ -513,6 +553,26 @@ public class Arena {
 		blocksBrokenThisGame.clear();
 		teamWasAtOne.clear();
 		state = ArenaState.WAITING;
+	}
+
+	/**
+	 * A victory sound for every connected player (centred on each of them individually, so it's
+	 * heard clearly wherever they are), plus a firework particle burst + launch/blast sounds at the
+	 * arena's lobby specifically - everyone's already standing there by the time this runs, via
+	 * {@link #reset}. Mirrors the celebration from the user's fabric-example-mod-26.2 gamemode.
+	 */
+	private void playVictoryCelebration() {
+		for (Player online : Bukkit.getOnlinePlayers()) {
+			online.playSound(online.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0F, 1.0F);
+		}
+		if (lobby == null || !lobby.isWorldLoaded()) {
+			return;
+		}
+		World world = lobby.getWorld();
+		Location center = lobby.clone().add(0, 1, 0);
+		world.spawnParticle(Particle.FIREWORK, center, 150, 2.0, 1.5, 2.0, 0.3);
+		world.playSound(lobby, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, SoundCategory.MASTER, 2.0F, 1.0F);
+		world.playSound(lobby, Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST, SoundCategory.MASTER, 2.0F, 1.0F);
 	}
 
 	/** Force-stops the arena immediately, e.g. from an admin command or plugin shutdown. */
@@ -527,7 +587,7 @@ public class Arena {
 			broadcast(ChatColor.RED + "The game was stopped.");
 		}
 		leaveAll();
-		regen.revertAll();
+		snapshot.restore();
 		state = ArenaState.WAITING;
 	}
 

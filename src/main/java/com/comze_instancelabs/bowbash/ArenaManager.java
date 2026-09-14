@@ -43,6 +43,8 @@ public class ArenaManager {
 			arena.setLobby(stringToLoc(config.getString(base + "lobby")));
 			arena.setSpawn(Team.RED, stringToLoc(config.getString(base + "spawn_red")));
 			arena.setSpawn(Team.BLUE, stringToLoc(config.getString(base + "spawn_blue")));
+			arena.setPos1(stringToLoc(config.getString(base + "pos1")));
+			arena.setPos2(stringToLoc(config.getString(base + "pos2")));
 			arena.setDefaultScore(config.getInt(base + "default_score", arena.getDefaultScore()));
 			arenas.put(name.toLowerCase(), arena);
 		}
@@ -57,6 +59,8 @@ public class ArenaManager {
 			config.set(base + "lobby", locToString(arena.getLobby()));
 			config.set(base + "spawn_red", locToString(arena.getSpawn(Team.RED)));
 			config.set(base + "spawn_blue", locToString(arena.getSpawn(Team.BLUE)));
+			config.set(base + "pos1", locToString(arena.getPos1()));
+			config.set(base + "pos2", locToString(arena.getPos2()));
 			config.set(base + "default_score", arena.getDefaultScore());
 		}
 		try {

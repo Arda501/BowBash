@@ -29,6 +29,7 @@ import org.bukkit.event.player.PlayerEggThrowEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
@@ -63,6 +64,24 @@ public class GameListener implements Listener {
 		// the point, see Arena#onPlayerMove.
 		Player p = event.getPlayer();
 		arenaOf(p).ifPresent(a -> a.onPlayerMove(p));
+	}
+
+	@EventHandler
+	public void onRespawn(PlayerRespawnEvent event) {
+		// whatever actually causes the respawn is someone else's problem (see the class doc) - this
+		// just makes sure that landing spot is the player's own team spawn instead of the world's,
+		// for as long as their round is still going.
+		Player p = event.getPlayer();
+		arenaOf(p).ifPresent(a -> {
+			if (!a.isInGame()) {
+				return;
+			}
+			Team team = a.getTeam(p.getUniqueId());
+			Location spawn = team != null ? a.getSpawn(team) : null;
+			if (spawn != null) {
+				event.setRespawnLocation(spawn);
+			}
+		});
 	}
 
 	@EventHandler
@@ -213,7 +232,6 @@ public class GameListener implements Listener {
 			if (isProtected(a, block.getLocation())) {
 				return;
 			}
-			a.getRegen().record(block.getLocation());
 			Material reward = isStainedGlass(block.getType()) ? block.getType() : Material.WHITE_STAINED_GLASS;
 			p.getInventory().addItem(new ItemStack(reward, 1));
 			p.updateInventory();
@@ -264,7 +282,7 @@ public class GameListener implements Listener {
 					event.getEntity().remove();
 					return;
 				}
-				boolean brokeToAir = degrade(a, hit);
+				boolean brokeToAir = degrade(hit);
 				if (brokeToAir) {
 					a.onBlockBroken(p.getUniqueId());
 				}
@@ -283,7 +301,6 @@ public class GameListener implements Listener {
 					for (int z = -radius; z <= radius; z++) {
 						Block b = l.getWorld().getBlockAt(l.getBlockX() + x, l.getBlockY(), l.getBlockZ() + z);
 						if (!isProtected(a, b.getLocation()) && isStainedGlass(b.getType()) && farmGlassOwner(b.getType()) == null) {
-							a.getRegen().record(b.getLocation());
 							b.setType(Material.AIR);
 						}
 					}
@@ -304,13 +321,12 @@ public class GameListener implements Listener {
 	 * Degrades a single block one step along its destruction chain (e.g. stone -&gt; cobblestone
 	 * -&gt; air). Returns true if the block ended up as air on this hit.
 	 */
-	private boolean degrade(Arena a, Block hit) {
+	private boolean degrade(Block hit) {
 		Material type = hit.getType();
 		if (farmGlassOwner(type) != null) {
 			// an infinite farming block: arrows just bounce off it, mining is the only way to harvest it
 			return false;
 		}
-		a.getRegen().record(hit.getLocation());
 
 		if (isStainedGlass(type)) {
 			hit.setType(Material.AIR);
