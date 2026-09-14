@@ -18,6 +18,10 @@ mvn clean package
 
 Produces `target/BowBash-<version>.jar`. Drop it into your server's `plugins/` folder.
 
+Pushing a version tag (`git tag v2.0.1 && git push origin v2.0.1`) instead builds it on GitHub
+and attaches the jar to a new [Release](https://github.com/Arda501/BowBash/releases) - no local
+build needed.
+
 Setting up an arena
 --------------------
 
