@@ -46,6 +46,11 @@ public class ArenaManager {
 			arena.setPos1(stringToLoc(config.getString(base + "pos1")));
 			arena.setPos2(stringToLoc(config.getString(base + "pos2")));
 			arena.setDefaultScore(config.getInt(base + "default_score", arena.getDefaultScore()));
+			try {
+				arena.loadMapBaseline();
+			} catch (IOException e) {
+				plugin.getLogger().warning("Could not load saved map baseline for arena '" + name + "': " + e.getMessage());
+			}
 			arenas.put(name.toLowerCase(), arena);
 		}
 		plugin.getLogger().info("Loaded " + arenas.size() + " arena(s).");
@@ -84,6 +89,7 @@ public class ArenaManager {
 			return false;
 		}
 		arena.forceStop();
+		arena.deleteMapBaseline();
 		save();
 		return true;
 	}

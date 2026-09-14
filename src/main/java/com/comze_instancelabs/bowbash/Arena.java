@@ -1,5 +1,7 @@
 package com.comze_instancelabs.bowbash;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -113,7 +115,31 @@ public class Arena {
 	}
 
 	public boolean isFullyConfigured() {
-		return lobby != null && spawns[0] != null && spawns[1] != null && pos1 != null && pos2 != null;
+		return lobby != null && spawns[0] != null && spawns[1] != null && pos1 != null && pos2 != null && snapshot.isCaptured();
+	}
+
+	/** Captures the current pos1/pos2 box as this arena's reset baseline and writes it to disk - {@code /bb savemap}. */
+	public boolean saveMapBaseline() throws IOException {
+		if (pos1 == null || pos2 == null) {
+			return false;
+		}
+		snapshot.capture(pos1, pos2);
+		snapshot.save(snapshotFile());
+		return true;
+	}
+
+	/** Loads a previously saved baseline from disk, if any - called once by {@link ArenaManager#load()}. */
+	public void loadMapBaseline() throws IOException {
+		snapshot.load(snapshotFile());
+	}
+
+	/** Removes this arena's saved baseline file, if any - called by {@link ArenaManager#remove}. */
+	public void deleteMapBaseline() {
+		snapshotFile().delete();
+	}
+
+	private File snapshotFile() {
+		return new File(plugin.getDataFolder(), "maps/" + name + ".snapshot");
 	}
 
 	public int getDefaultScore() {
@@ -388,7 +414,6 @@ public class Arena {
 		state = ArenaState.INGAME;
 		teamWasAtOne.clear();
 		readyPlayers.clear();
-		snapshot.capture(pos1, pos2);
 
 		int startingScore = defaultScore;
 		redScore = startingScore;

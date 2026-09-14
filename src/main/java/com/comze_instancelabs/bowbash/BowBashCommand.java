@@ -40,6 +40,7 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			case "setspawn" -> admin(sender, args, this::setSpawn);
 			case "pos1" -> admin(sender, args, (p, a) -> setPos(p, a, 1));
 			case "pos2" -> admin(sender, args, (p, a) -> setPos(p, a, 2));
+			case "savemap" -> admin(sender, args, this::saveMap);
 			case "setdefaultscore" -> admin(sender, args, this::setDefaultScore);
 			case "stop" -> admin(sender, args, this::forceStop);
 			default -> sendHelp(sender);
@@ -125,7 +126,8 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 		plugin.getArenaManager().create(args[1], p.getWorld());
 		p.sendMessage(ChatColor.GREEN + "Created arena '" + args[1] + "'. Now set its lobby, both spawns, and both corners of the playable area:");
 		p.sendMessage(ChatColor.GRAY + "/bb setlobby " + args[1] + "  |  /bb setspawn " + args[1] + " red  |  /bb setspawn " + args[1] + " blue");
-		p.sendMessage(ChatColor.GRAY + "/bb pos1 " + args[1] + "  |  /bb pos2 " + args[1] + "  (opposite corners of the map - it all resets to this after every round)");
+		p.sendMessage(ChatColor.GRAY + "/bb pos1 " + args[1] + "  |  /bb pos2 " + args[1] + "  (opposite corners of the map)");
+		p.sendMessage(ChatColor.GRAY + "/bb savemap " + args[1] + "  (do this last, once the map actually looks how you want it to reset to - it won't be joinable until you do)");
 	}
 
 	private void remove(Player p, String[] args) {
@@ -171,6 +173,23 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			plugin.getArenaManager().save();
 			p.sendMessage(ChatColor.GREEN + "Corner " + which + " for '" + arena.getName() + "' set to your location."
 					+ (arena.getPos1() != null && arena.getPos2() != null ? "" : ChatColor.YELLOW + " Set the other corner too - the whole box between them gets reset after every round."));
+		});
+	}
+
+	private void saveMap(Player p, String[] args) {
+		withArena(p, args, arena -> {
+			try {
+				if (!arena.saveMapBaseline()) {
+					p.sendMessage(ChatColor.RED + "Set both /bb pos1 and /bb pos2 for '" + arena.getName() + "' first.");
+					return;
+				}
+			} catch (java.io.IOException e) {
+				p.sendMessage(ChatColor.RED + "Captured it in memory, but couldn't write it to disk - see the server log. "
+						+ "It won't survive a restart until this is fixed.");
+				plugin.getLogger().warning("Could not save map baseline for arena '" + arena.getName() + "': " + e.getMessage());
+				return;
+			}
+			p.sendMessage(ChatColor.GREEN + "Saved '" + arena.getName() + "' as its reset baseline - captures everything between pos1 and pos2 right now.");
 		});
 	}
 
@@ -238,7 +257,8 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 			sender.sendMessage(ChatColor.GRAY + "/bb remove <arena>");
 			sender.sendMessage(ChatColor.GRAY + "/bb setlobby <arena>");
 			sender.sendMessage(ChatColor.GRAY + "/bb setspawn <arena> <red|blue>");
-			sender.sendMessage(ChatColor.GRAY + "/bb pos1|pos2 <arena>" + ChatColor.DARK_GRAY + " - opposite corners of the map, reset after every round");
+			sender.sendMessage(ChatColor.GRAY + "/bb pos1|pos2 <arena>" + ChatColor.DARK_GRAY + " - opposite corners of the map");
+			sender.sendMessage(ChatColor.GRAY + "/bb savemap <arena>" + ChatColor.DARK_GRAY + " - capture the pos1/pos2 box as the reset baseline");
 			sender.sendMessage(ChatColor.GRAY + "/bb setdefaultscore <arena> <n>");
 			sender.sendMessage(ChatColor.GRAY + "/bb stop <arena>");
 		}
@@ -250,7 +270,7 @@ public class BowBashCommand implements CommandExecutor, TabCompleter {
 		if (args.length == 1) {
 			options.addAll(List.of("join", "leave", "list", "help"));
 			if (sender.hasPermission("bowbash.admin")) {
-				options.addAll(List.of("create", "remove", "setlobby", "setspawn", "pos1", "pos2", "setdefaultscore", "stop"));
+				options.addAll(List.of("create", "remove", "setlobby", "setspawn", "pos1", "pos2", "savemap", "setdefaultscore", "stop"));
 			}
 		} else if (args.length == 2) {
 			for (Arena arena : plugin.getArenaManager().getAll()) {

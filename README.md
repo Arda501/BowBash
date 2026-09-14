@@ -30,11 +30,13 @@ All setup commands require the `bowbash.admin` permission (granted to ops by def
 /bb setspawn <arena> blue     # stand at the blue team's starting platform
 /bb pos1 <arena>              # stand at one corner of the playable map area
 /bb pos2 <arena>              # stand at the opposite corner
+/bb savemap <arena>           # capture everything in that box as the reset baseline
 ```
 
-That's the minimum to make an arena joinable — `pos1`/`pos2` (opposite corners of
-a box that should contain the whole map) are required so the arena knows what to
-snapshot and reset each round. Optional:
+That's the minimum to make an arena joinable — do `savemap` last, once the map
+actually looks how you want it to reset to; the arena won't be joinable until
+you do. Re-run it any time you deliberately change the built map and want that
+to become the new baseline. Optional:
 
 ```
 /bb setdefaultscore <arena> <n>
@@ -52,10 +54,11 @@ starts automatically; un-readying, or a team becoming uneven, cancels it instant
 Joining puts you in Adventure mode; when the round actually starts every player is
 switched to Survival, and back to Adventure once the round ends.
 
-The whole `pos1`/`pos2` box is snapshotted the instant a round starts and restored
-block-for-block the instant it ends — covers everything that changed, broken or
-placed, not just what BowBash itself touched, so the map is always back to exactly
-its starting state for the next round.
+The `/bb savemap` baseline is restored block-for-block the instant a round ends —
+covers everything that changed, broken or placed, not just what BowBash itself
+touched — and persists to disk, so it survives a server restart; nothing is
+re-captured automatically, the saved baseline is what every round resets to
+until you `savemap` again.
 
 Placing **light blue stained glass** and **orange stained glass** anywhere in an
 arena (typically near a team's spawn) creates an infinite block-farming resource:
