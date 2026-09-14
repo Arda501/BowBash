@@ -55,8 +55,11 @@ names the arena. There's no minimum or maximum player count.
 Joining hands you a "Not Ready" item — right-click it to ready up. As soon as both
 teams are the same size (at least 1 each) and everyone's ready, a short countdown
 starts automatically; un-readying, or a team becoming uneven, cancels it instantly.
-Joining puts you in Adventure mode; when the round actually starts every player is
-switched to Survival, and back to Adventure once the round ends.
+Joining also hands you a barrier "Leave" item — right-click it to leave the arena,
+same as typing `/bb leave`. Neither item can be dropped, placed, or moved out of
+its hotbar slot for more than a fraction of a second. Joining puts you in
+Adventure mode; when the round actually starts every player is switched to
+Survival, and back to Adventure once the round ends.
 
 The `/bb savemap` baseline is restored block-for-block the instant a round ends —
 covers everything that changed, broken or placed, not just what BowBash itself

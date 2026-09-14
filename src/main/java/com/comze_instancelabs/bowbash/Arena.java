@@ -291,6 +291,7 @@ public class Arena {
 	private void giveReadyItem(Player p) {
 		p.getInventory().clear();
 		p.getInventory().setItem(ReadyItem.SLOT, ReadyItem.notReady(plugin));
+		p.getInventory().setItem(LeaveItem.SLOT, LeaveItem.build(plugin));
 	}
 
 	/** Right-clicking the ready item calls this. */
@@ -312,7 +313,7 @@ public class Arena {
 		plugin.getScoreboardManager().updateLobby(this);
 	}
 
-	/** Self-healing: keeps the ready item pinned to its slot for everyone currently waiting. */
+	/** Self-healing: keeps the ready item and the leave item pinned to their slots for everyone currently waiting. */
 	private void enforceReadyItems() {
 		for (UUID id : players) {
 			Player p = Bukkit.getPlayer(id);
@@ -322,10 +323,10 @@ public class Arena {
 			var inv = p.getInventory();
 			boolean ready = readyPlayers.contains(id);
 			for (int slot = 0; slot < inv.getSize(); slot++) {
-				if (slot == ReadyItem.SLOT) {
-					continue;
+				if (slot != ReadyItem.SLOT && ReadyItem.isReadyItem(plugin, inv.getItem(slot))) {
+					inv.setItem(slot, null);
 				}
-				if (ReadyItem.isReadyItem(plugin, inv.getItem(slot))) {
+				if (slot != LeaveItem.SLOT && LeaveItem.isLeaveItem(plugin, inv.getItem(slot))) {
 					inv.setItem(slot, null);
 				}
 			}
@@ -333,6 +334,9 @@ public class Arena {
 			boolean correct = ReadyItem.isReadyItem(plugin, current) && current.getType() == (ready ? org.bukkit.Material.LIME_DYE : org.bukkit.Material.GRAY_DYE);
 			if (!correct) {
 				inv.setItem(ReadyItem.SLOT, ready ? ReadyItem.ready(plugin) : ReadyItem.notReady(plugin));
+			}
+			if (!LeaveItem.isLeaveItem(plugin, inv.getItem(LeaveItem.SLOT))) {
+				inv.setItem(LeaveItem.SLOT, LeaveItem.build(plugin));
 			}
 		}
 	}

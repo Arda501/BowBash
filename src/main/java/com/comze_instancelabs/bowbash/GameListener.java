@@ -174,8 +174,29 @@ public class GameListener implements Listener {
 	}
 
 	@EventHandler
+	public void onLeaveItemUse(PlayerInteractEvent event) {
+		if (event.getAction() != Action.RIGHT_CLICK_AIR && event.getAction() != Action.RIGHT_CLICK_BLOCK) {
+			return;
+		}
+		Player p = event.getPlayer();
+		if (!LeaveItem.isLeaveItem(plugin, event.getItem())) {
+			return;
+		}
+		event.setCancelled(true);
+		if (arenaOf(p).isPresent()) {
+			p.performCommand("bb leave");
+		}
+	}
+
+	@EventHandler
 	public void onPlace(BlockPlaceEvent event) {
 		Player p = event.getPlayer();
+		// a barrier isn't placeable in adventure mode anyway (no CanPlaceOn tag), but refuse it
+		// explicitly too - the leave item is never meant to become a block, in any game mode.
+		if (LeaveItem.isLeaveItem(plugin, event.getItemInHand())) {
+			event.setCancelled(true);
+			return;
+		}
 		arenaOf(p).ifPresent(a -> {
 			if (a.isInGame() && isProtected(a, event.getBlock().getLocation())) {
 				event.setCancelled(true);
