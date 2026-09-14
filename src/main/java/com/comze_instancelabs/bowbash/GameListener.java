@@ -22,6 +22,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerEggThrowEvent;
@@ -37,10 +38,12 @@ import org.bukkit.util.BlockIterator;
 /**
  * All of BowBash's actual gameplay: falling below the arena scores a point, arrows/eggs/snowballs
  * eat away at the map, and blocks broken near a spawn platform hand back the material instead of
- * just vanishing. Health, damage and death/respawn are entirely someone else's problem - BowBash
- * doesn't touch any of it beyond {@link #onEntityDamageByEntity} cancelling friendly fire; in
- * particular it never resets a player's health, so whatever else is handling death (a command
- * block, another plugin, plain vanilla) works exactly as it would outside BowBash.
+ * just vanishing. BowBash never causes or prevents a death itself (see {@link #onEntityDamageByEntity},
+ * which only ever cancels friendly fire) - whatever else is handling that (a command block,
+ * another plugin, plain vanilla) works exactly as it would outside BowBash. Once a death does
+ * happen, though, BowBash does take over what comes after: a short delay, then an automatic
+ * respawn with no button to click, landing back at the player's own team spawn with a fresh kit -
+ * see {@link #onDeath}/{@link #onRespawn} and {@link Arena#beginRespawnDelay}.
  *
  * This is a straight port of the original mechanics off the pre-1.13 numeric block-id/data-value API
  * (which no longer exists) onto modern {@link Material}/{@link org.bukkit.block.data.BlockData}.
@@ -67,10 +70,19 @@ public class GameListener implements Listener {
 	}
 
 	@EventHandler
+	public void onDeath(PlayerDeathEvent event) {
+		// whatever actually caused the death is someone else's problem (see the class doc) - this
+		// just starts the respawn-delay countdown that ends in an automatic respawn, no click needed.
+		Player p = event.getEntity();
+		arenaOf(p).ifPresent(a -> {
+			if (a.isInGame()) {
+				a.beginRespawnDelay(p);
+			}
+		});
+	}
+
+	@EventHandler
 	public void onRespawn(PlayerRespawnEvent event) {
-		// whatever actually causes the respawn is someone else's problem (see the class doc) - this
-		// just makes sure that landing spot is the player's own team spawn instead of the world's,
-		// for as long as their round is still going.
 		Player p = event.getPlayer();
 		arenaOf(p).ifPresent(a -> {
 			if (!a.isInGame()) {
@@ -80,6 +92,10 @@ public class GameListener implements Listener {
 			Location spawn = team != null ? a.getSpawn(team) : null;
 			if (spawn != null) {
 				event.setRespawnLocation(spawn);
+			}
+			if (team != null) {
+				// Deferred a tick: the respawn itself isn't fully applied yet at this point in the event.
+				Bukkit.getScheduler().runTask(plugin, () -> plugin.getKit().giveKit(p, team));
 			}
 		});
 	}

@@ -69,14 +69,16 @@ can't mine (or deplete) them at all.
 
 Falling out of the arena scores a point immediately (decided the moment a player
 first drops below Y=0), with a sound cue for the whole arena and the scoreboard
-updated on the spot. BowBash doesn't touch health, damage, or death/respawn at
-all beyond cancelling friendly fire — it never resets a player's health, so
-whatever else is handling death (a command block, another plugin, plain vanilla)
-works exactly as it would outside BowBash; it does still redirect any respawn
-that happens back to the player's own team spawn (instead of the world spawn)
-for as long as their round is live. Winning a round plays a victory sound for
-every player on the server plus a handful of real firework rockets, in the
-winning team's colour, launched over the arena's lobby.
+updated on the spot. The in-game scoreboard also shows an elapsed-time "Time:
+M:SS" line, always on top. BowBash doesn't touch health or damage beyond
+cancelling friendly fire, and never *causes or prevents* a death — that's left
+entirely to whatever else is handling it (a command block, another plugin,
+plain vanilla). Once a death does happen, though, BowBash takes over what comes
+after: a short delay (`config.respawn_delay_seconds`, default 1s), then an
+automatic respawn with no button to click, landing back at the player's own
+team spawn with a fresh kit. Winning a round plays a victory sound for every
+player on the server plus a handful of real firework rockets, in the winning
+team's colour, launched over the arena's lobby.
 
 **Blue/black/red/light blue glazed terracotta**, **polished sulfur slabs**, and
 **dark prismarine slabs** can't be broken at all, by anyone, through any means

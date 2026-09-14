@@ -13,3 +13,5 @@ config:
   lobby_countdown_seconds: 10
   # default starting score (lives) per team if an arena doesn't override it
   default_score: 4
+  # seconds between a rostered player actually dying and BowBash force-respawning them (no click needed)
+  respawn_delay_seconds: 1.0

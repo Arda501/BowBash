@@ -3,6 +3,7 @@ package com.comze_instancelabs.bowbash;
 import java.io.File;
 import java.io.IOException;
 import java.util.EnumSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
@@ -56,6 +57,12 @@ public class Arena {
 
 	/** Ticks remaining in the ready countdown, counted down by {@link #tick()}; -1 = not counting down. */
 	private int countdownTicksRemaining = -1;
+
+	/** Ticks since the current round went INGAME - drives the scoreboard's elapsed-time line. Uncapped. */
+	private int roundElapsedTicks = 0;
+
+	/** Ticks left before a dead player is force-respawned; see {@link #beginRespawnDelay}. */
+	private final Map<UUID, Integer> pendingRespawns = new LinkedHashMap<>();
 
 	private BukkitTask powerupTask;
 
@@ -191,6 +198,12 @@ public class Arena {
 		return countdownTicksRemaining < 0 ? -1 : countdownTicksRemaining / 20;
 	}
 
+	/** "M:SS" elapsed since the round went INGAME. */
+	public String getElapsedTimeFormatted() {
+		int totalSeconds = roundElapsedTicks / 20;
+		return String.format("%d:%02d", totalSeconds / 60, totalSeconds % 60);
+	}
+
 	public boolean isInGame() {
 		return state == ArenaState.INGAME;
 	}
@@ -243,6 +256,7 @@ public class Arena {
 		playerTeam.remove(id);
 		readyPlayers.remove(id);
 		belowVoid.remove(id);
+		pendingRespawns.remove(id);
 		blocksBrokenThisGame.remove(id);
 		plugin.getKit().removeArmor(p);
 		p.getInventory().clear();
@@ -385,6 +399,15 @@ public class Arena {
 	 * next second boundary) the moment a team becomes uneven or someone un-readies.
 	 */
 	public void tick(int tickIntervalTicks) {
+		if (state == ArenaState.INGAME) {
+			tickPendingRespawns(tickIntervalTicks);
+			roundElapsedTicks += tickIntervalTicks;
+			if (roundElapsedTicks % 20 < tickIntervalTicks) {
+				// once a second, roughly - refreshes the "M:SS" line
+				plugin.getScoreboardManager().updateInGame(this);
+			}
+			return;
+		}
 		if (state != ArenaState.WAITING && state != ArenaState.STARTING) {
 			return;
 		}
@@ -413,6 +436,8 @@ public class Arena {
 		state = ArenaState.INGAME;
 		teamWasAtOne.clear();
 		readyPlayers.clear();
+		roundElapsedTicks = 0;
+		pendingRespawns.clear();
 
 		int startingScore = defaultScore;
 		redScore = startingScore;
@@ -435,6 +460,41 @@ public class Arena {
 
 		int intervalTicks = Math.max(1, plugin.getConfig().getInt("config.powerup_interval_seconds", 3)) * 20;
 		powerupTask = Bukkit.getScheduler().runTaskTimer(plugin, this::maybeSpawnPowerup, intervalTicks, intervalTicks);
+	}
+
+	/**
+	 * Called by the game listener whenever a rostered player actually dies (from whatever cause -
+	 * BowBash doesn't decide that, see {@link GameListener}). Starts a short countdown, after which
+	 * {@link #tickPendingRespawns} forces their actual respawn itself - no button click needed -
+	 * landing them at their team spawn with a fresh kit via {@code GameListener#onRespawn}.
+	 */
+	public void beginRespawnDelay(Player p) {
+		int delayTicks = (int) Math.round(plugin.getConfig().getDouble("config.respawn_delay_seconds", 1.0) * 20.0);
+		pendingRespawns.put(p.getUniqueId(), delayTicks);
+	}
+
+	private void tickPendingRespawns(int tickIntervalTicks) {
+		if (pendingRespawns.isEmpty()) {
+			return;
+		}
+		Iterator<Map.Entry<UUID, Integer>> it = pendingRespawns.entrySet().iterator();
+		while (it.hasNext()) {
+			Map.Entry<UUID, Integer> entry = it.next();
+			Player p = Bukkit.getPlayer(entry.getKey());
+			if (p == null) {
+				it.remove();
+				continue;
+			}
+			int ticksLeft = entry.getValue() - tickIntervalTicks;
+			if (ticksLeft <= 0) {
+				it.remove();
+				if (p.isDead()) {
+					p.spigot().respawn();
+				}
+				continue;
+			}
+			entry.setValue(ticksLeft);
+		}
 	}
 
 	private void maybeSpawnPowerup() {
@@ -574,6 +634,7 @@ public class Arena {
 		playerTeam.clear();
 		readyPlayers.clear();
 		belowVoid.clear();
+		pendingRespawns.clear();
 		blocksBrokenThisGame.clear();
 		teamWasAtOne.clear();
 		state = ArenaState.WAITING;

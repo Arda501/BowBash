@@ -1,6 +1,8 @@
 package com.comze_instancelabs.bowbash;
 
 import org.bukkit.Bukkit;
+import org.bukkit.GameRule;
+import org.bukkit.World;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public class Main extends JavaPlugin {
@@ -16,6 +18,14 @@ public class Main extends JavaPlugin {
 	@Override
 	public void onEnable() {
 		saveDefaultConfig();
+
+		// So the respawn-delay mechanic (Arena#beginRespawnDelay) works the same with or without
+		// Recored also installed: no item drops on death (we reissue a kit anyway), and the death
+		// screen doesn't auto-respawn before Arena's own delayed, click-free respawn gets to it.
+		for (World world : Bukkit.getWorlds()) {
+			world.setGameRule(GameRule.KEEP_INVENTORY, true);
+			world.setGameRule(GameRule.DO_IMMEDIATE_RESPAWN, false);
+		}
 
 		this.arenaManager = new ArenaManager(this);
 		this.scoreboardManager = new BowBashScoreboard();

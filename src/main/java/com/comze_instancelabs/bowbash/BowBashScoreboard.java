@@ -37,6 +37,7 @@ public class BowBashScoreboard {
 
 	public void updateInGame(Arena arena) {
 		List<String> lines = new ArrayList<>();
+		lines.add(ChatColor.GRAY + "" + ChatColor.BOLD + "Time: " + ChatColor.WHITE + arena.getElapsedTimeFormatted());
 		lines.add(Team.RED.chatColor() + "Red: " + ChatColor.WHITE + Math.max(0, arena.getRedScore()));
 		lines.add(Team.BLUE.chatColor() + "Blue: " + ChatColor.WHITE + Math.max(0, arena.getBlueScore()));
 		render(arena, ChatColor.AQUA + "" + ChatColor.BOLD + arena.getName(), lines);
