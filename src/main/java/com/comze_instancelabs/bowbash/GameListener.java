@@ -23,7 +23,6 @@ import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityPickupItemEvent;
-import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.entity.ProjectileHitEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerEggThrowEvent;
@@ -36,8 +35,11 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.util.BlockIterator;
 
 /**
- * All of BowBash's actual gameplay: falling out eliminates you, arrows/eggs/snowballs eat away at
- * the map, and blocks broken near a spawn platform hand back the material instead of just vanishing.
+ * All of BowBash's actual gameplay: falling below the arena scores a point, arrows/eggs/snowballs
+ * eat away at the map, and blocks broken near a spawn platform hand back the material instead of
+ * just vanishing. Actual player death and respawn are deliberately left untouched here - handled
+ * separately, outside this plugin - beyond the health-lock that keeps ordinary combat from killing
+ * anyone outright (see {@link #onEntityDamage}/{@link #onEntityDamageByEntity}).
  *
  * This is a straight port of the original mechanics off the pre-1.13 numeric block-id/data-value API
  * (which no longer exists) onto modern {@link Material}/{@link org.bukkit.block.data.BlockData}.
@@ -56,22 +58,11 @@ public class GameListener implements Listener {
 
 	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onMove(PlayerMoveEvent event) {
+		// scores a point the moment a player first drops below Y=0; whatever actually then happens
+		// to them (death, respawn, teleport) is left entirely to the server - BowBash only tracks
+		// the point, see Arena#onPlayerMove.
 		Player p = event.getPlayer();
-		arenaOf(p).ifPresent(a -> {
-			if (a.isInGame() && p.getLocation().getY() < 0) {
-				a.onPlayerFell(p);
-			}
-		});
-	}
-
-	@EventHandler
-	public void onPlayerDeath(PlayerDeathEvent event) {
-		Player p = event.getEntity();
-		arenaOf(p).ifPresent(a -> {
-			if (a.isInGame()) {
-				p.setHealth(20D);
-			}
-		});
+		arenaOf(p).ifPresent(a -> a.onPlayerMove(p));
 	}
 
 	@EventHandler
@@ -210,9 +201,10 @@ public class GameListener implements Listener {
 			Team farmOwner = farmGlassOwner(block.getType());
 			if (farmOwner != null) {
 				// an infinite farming block: it never actually breaks/disappears, and only its own
-				// team can harvest it - the other team gets nothing (and can't deplete it either)
+				// team can harvest it (for their team-coloured glass, not the farm block's own
+				// colour) - the other team gets nothing and can't deplete it either
 				if (a.getTeam(p.getUniqueId()) == farmOwner) {
-					p.getInventory().addItem(new ItemStack(block.getType(), 1));
+					p.getInventory().addItem(new ItemStack(farmGlassReward(farmOwner), 1));
 					p.updateInventory();
 				}
 				return;
@@ -371,6 +363,11 @@ public class GameListener implements Listener {
 			return Team.RED;
 		}
 		return null;
+	}
+
+	/** What mining a team's farm-glass block actually hands them: their own team-coloured glass. */
+	private Material farmGlassReward(Team owner) {
+		return owner == Team.BLUE ? Material.BLUE_STAINED_GLASS : Material.RED_STAINED_GLASS;
 	}
 
 	private boolean isProtected(Arena a, Location l) {

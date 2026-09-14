@@ -33,8 +33,6 @@ All setup commands require the `bowbash.admin` permission (granted to ops by def
 That's the minimum to make an arena joinable. Optional:
 
 ```
-/bb setminplayers <arena> <n>
-/bb setmaxplayers <arena> <n>
 /bb setdefaultscore <arena> <n>
 /bb remove <arena>
 /bb stop <arena>              # force-stop and reset a running/stuck arena
@@ -51,9 +49,16 @@ Any blocks destroyed during the match are automatically restored when it ends.
 
 Placing **light blue stained glass** and **orange stained glass** anywhere in an
 arena (typically near a team's spawn) creates an infinite block-farming resource:
-light blue can be mined for an endless supply of glass by the blue team, orange by
-the red team. These blocks never actually break, can't be destroyed by arrows or
-egg/snowball explosions, and the opposing team can't mine (or deplete) them at all.
+mining light blue hands the blue team endless blue stained glass, mining orange
+hands the red team endless red stained glass. These blocks never actually break,
+can't be destroyed by arrows or egg/snowball explosions, and the opposing team
+can't mine (or deplete) them at all.
+
+BowBash only *scores* a fall out of the arena (one team's point, decided the moment
+a player first drops below Y=0) — it deliberately doesn't touch actual death or
+respawning (no forced teleport, no health reset on death) beyond keeping ordinary
+combat from killing anyone outright, so it expects something else on the server to
+handle what happens to a player physically after that point.
 
 Links
 -----

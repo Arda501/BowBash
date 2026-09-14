@@ -196,6 +196,7 @@ public class Arena {
 		players.remove(id);
 		playerTeam.remove(id);
 		readyPlayers.remove(id);
+		belowVoid.remove(id);
 		blocksBrokenThisGame.remove(id);
 		plugin.getKit().removeArmor(p);
 		p.getInventory().clear();
@@ -407,11 +408,31 @@ public class Arena {
 		Powerups.spawn(plugin, target.getLocation().clone().add(0, 5, 0));
 	}
 
-	/** Called by the game listener whenever a player falls out of the arena. */
-	public void onPlayerFell(Player faller) {
+	/**
+	 * Players currently below Y=0, so a fall only docks a point once per excursion instead of once
+	 * per movement tick they spend down there - see {@link #onPlayerMove(Player)}. Actually dying
+	 * and respawning is intentionally left to whatever the server does with that on its own; BowBash
+	 * only cares about the points.
+	 */
+	private final Set<UUID> belowVoid = new LinkedHashSet<>();
+
+	/** Called by the game listener on every move of a player in this arena. */
+	public void onPlayerMove(Player p) {
 		if (state != ArenaState.INGAME) {
 			return;
 		}
+		UUID id = p.getUniqueId();
+		if (p.getLocation().getY() < 0) {
+			if (belowVoid.add(id)) {
+				onPlayerFell(p);
+			}
+		} else {
+			belowVoid.remove(id);
+		}
+	}
+
+	/** One point for falling out of the arena; nothing else about actual death/respawn is handled here. */
+	private void onPlayerFell(Player faller) {
 		Team fallenTeam = playerTeam.get(faller.getUniqueId());
 		if (fallenTeam == null) {
 			return;
@@ -437,9 +458,6 @@ public class Arena {
 			return;
 		}
 
-		Player p = faller;
-		p.teleport(spawns[fallenTeam.spawnIndex()]);
-		plugin.getKit().giveArmor(p, fallenTeam);
 		plugin.getScoreboardManager().updateInGame(this);
 	}
 
@@ -491,6 +509,7 @@ public class Arena {
 		players.clear();
 		playerTeam.clear();
 		readyPlayers.clear();
+		belowVoid.clear();
 		blocksBrokenThisGame.clear();
 		teamWasAtOne.clear();
 		state = ArenaState.WAITING;
