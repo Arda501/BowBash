@@ -13,7 +13,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.SoundCategory;
 import org.bukkit.World;
@@ -554,7 +553,7 @@ public class Arena {
 
 		Bukkit.getScheduler().runTaskLater(plugin, () -> {
 			reset();
-			playVictoryCelebration();
+			playVictoryCelebration(winner);
 		}, 100L);
 	}
 
@@ -582,11 +581,11 @@ public class Arena {
 
 	/**
 	 * A victory sound for every connected player (centred on each of them individually, so it's
-	 * heard clearly wherever they are), plus a firework particle burst + launch/blast sounds at the
-	 * arena's lobby specifically - everyone's already standing there by the time this runs, via
-	 * {@link #reset}. Mirrors the celebration from the user's fabric-example-mod-26.2 gamemode.
+	 * heard clearly wherever they are), plus a handful of real firework rockets launched over the
+	 * arena's lobby, in the winning team's colour - everyone's already standing there by the time
+	 * this runs, via {@link #reset}.
 	 */
-	private void playVictoryCelebration() {
+	private void playVictoryCelebration(Team winner) {
 		for (Player online : Bukkit.getOnlinePlayers()) {
 			online.playSound(online.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, SoundCategory.MASTER, 1.0F, 1.0F);
 		}
@@ -594,10 +593,24 @@ public class Arena {
 			return;
 		}
 		World world = lobby.getWorld();
-		Location center = lobby.clone().add(0, 1, 0);
-		world.spawnParticle(Particle.FIREWORK, center, 150, 2.0, 1.5, 2.0, 0.3);
-		world.playSound(lobby, Sound.ENTITY_FIREWORK_ROCKET_LAUNCH, SoundCategory.MASTER, 2.0F, 1.0F);
-		world.playSound(lobby, Sound.ENTITY_FIREWORK_ROCKET_LARGE_BLAST, SoundCategory.MASTER, 2.0F, 1.0F);
+		for (int i = 0; i < 6; i++) {
+			Bukkit.getScheduler().runTaskLater(plugin, () -> launchFirework(world, winner), i * 8L);
+		}
+	}
+
+	private void launchFirework(World world, Team winner) {
+		Location loc = lobby.clone().add((Math.random() * 6) - 3, 1, (Math.random() * 6) - 3);
+		org.bukkit.entity.Firework firework = world.spawn(loc, org.bukkit.entity.Firework.class);
+		org.bukkit.inventory.meta.FireworkMeta meta = firework.getFireworkMeta();
+		meta.addEffect(org.bukkit.FireworkEffect.builder()
+				.with(org.bukkit.FireworkEffect.Type.BALL_LARGE)
+				.withColor(winner.armorColor())
+				.withFade(org.bukkit.Color.WHITE)
+				.withTrail()
+				.withFlicker()
+				.build());
+		meta.setPower(1);
+		firework.setFireworkMeta(meta);
 	}
 
 	/** Force-stops the arena immediately, e.g. from an admin command or plugin shutdown. */

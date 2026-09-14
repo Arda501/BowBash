@@ -75,7 +75,8 @@ whatever else is handling death (a command block, another plugin, plain vanilla)
 works exactly as it would outside BowBash; it does still redirect any respawn
 that happens back to the player's own team spawn (instead of the world spawn)
 for as long as their round is live. Winning a round plays a victory sound for
-every player on the server plus a firework burst at the arena's lobby.
+every player on the server plus a handful of real firework rockets, in the
+winning team's colour, launched over the arena's lobby.
 
 **Blue/black/red/light blue glazed terracotta**, **polished sulfur slabs**, and
 **dark prismarine slabs** can't be broken at all, by anyone, through any means
