@@ -49,6 +49,12 @@ teams are the same size (at least 1 each) and everyone's ready, a short countdow
 starts automatically; un-readying, or a team becoming uneven, cancels it instantly.
 Any blocks destroyed during the match are automatically restored when it ends.
 
+Placing **light blue stained glass** and **orange stained glass** anywhere in an
+arena (typically near a team's spawn) creates an infinite block-farming resource:
+light blue can be mined for an endless supply of glass by the blue team, orange by
+the red team. These blocks never actually break, can't be destroyed by arrows or
+egg/snowball explosions, and the opposing team can't mine (or deplete) them at all.
+
 Links
 -----
 

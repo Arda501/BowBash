@@ -184,6 +184,12 @@ public class GameListener implements Listener {
 				return;
 			}
 			Block clicked = event.getClickedBlock();
+			Team farmOwner = farmGlassOwner(clicked.getType());
+			if (farmOwner != null) {
+				// a team's own farm block already hands out free copies via onBreak below; clicking
+				// it shouldn't ALSO give one, and the other team shouldn't get anything from it at all
+				return;
+			}
 			if (isProtected(a, clicked.getLocation()) && isStainedGlass(clicked.getType())) {
 				p.getInventory().addItem(new ItemStack(clicked.getType(), 1));
 				p.updateInventory();
@@ -200,6 +206,18 @@ public class GameListener implements Listener {
 			}
 			Block block = event.getBlock();
 			event.setCancelled(true);
+
+			Team farmOwner = farmGlassOwner(block.getType());
+			if (farmOwner != null) {
+				// an infinite farming block: it never actually breaks/disappears, and only its own
+				// team can harvest it - the other team gets nothing (and can't deplete it either)
+				if (a.getTeam(p.getUniqueId()) == farmOwner) {
+					p.getInventory().addItem(new ItemStack(block.getType(), 1));
+					p.updateInventory();
+				}
+				return;
+			}
+
 			if (isProtected(a, block.getLocation())) {
 				return;
 			}
@@ -267,12 +285,12 @@ public class GameListener implements Listener {
 		// egg/snowball: area-clear stained glass around the hit point, then always detonate
 		try {
 			Location l = hit.getLocation();
-			if (isStainedGlass(hit.getType())) {
+			if (isStainedGlass(hit.getType()) && farmGlassOwner(hit.getType()) == null) {
 				int radius = mega ? 2 : 1;
 				for (int x = -radius; x <= radius; x++) {
 					for (int z = -radius; z <= radius; z++) {
 						Block b = l.getWorld().getBlockAt(l.getBlockX() + x, l.getBlockY(), l.getBlockZ() + z);
-						if (!isProtected(a, b.getLocation()) && isStainedGlass(b.getType())) {
+						if (!isProtected(a, b.getLocation()) && isStainedGlass(b.getType()) && farmGlassOwner(b.getType()) == null) {
 							a.getRegen().record(b.getLocation());
 							b.setType(Material.AIR);
 						}
@@ -296,6 +314,10 @@ public class GameListener implements Listener {
 	 */
 	private boolean degrade(Arena a, Block hit) {
 		Material type = hit.getType();
+		if (farmGlassOwner(type) != null) {
+			// an infinite farming block: arrows just bounce off it, mining is the only way to harvest it
+			return false;
+		}
 		a.getRegen().record(hit.getLocation());
 
 		if (isStainedGlass(type)) {
@@ -332,6 +354,23 @@ public class GameListener implements Listener {
 
 	private boolean isStainedGlass(Material m) {
 		return m.name().endsWith("_STAINED_GLASS");
+	}
+
+	/**
+	 * Light blue / orange stained glass are each a team's permanent, infinite block-farming
+	 * resource: never actually destroyed by anything (mining, arrows, eggs/snowballs), and only
+	 * mineable (for an item copy) by the team that owns that colour.
+	 *
+	 * @return the owning team, or {@code null} if {@code m} isn't a farm-glass material
+	 */
+	private Team farmGlassOwner(Material m) {
+		if (m == Material.LIGHT_BLUE_STAINED_GLASS) {
+			return Team.BLUE;
+		}
+		if (m == Material.ORANGE_STAINED_GLASS) {
+			return Team.RED;
+		}
+		return null;
 	}
 
 	private boolean isProtected(Arena a, Location l) {
